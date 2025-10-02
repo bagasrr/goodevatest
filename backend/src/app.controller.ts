@@ -32,10 +32,6 @@ export class AppController {
 
   @Patch(':id')
   toggleCompleted(@Param('id', ParseIntPipe) id: number): Todo {
-    if (!id) {
-      throw new Error('ID is required');
-    }
-    console.log(`Toggling completion status for todo ID: ${id}`);
     return this.appService.toggleCompleted(id);
   }
 }
