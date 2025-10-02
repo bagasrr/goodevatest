@@ -1,60 +1,96 @@
 import { useState, useEffect, useMemo } from "react";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 
-// Konfigurasi URL base untuk API backend
 const API_URL = "http://localhost:3000/api/todos";
+
+let userId = localStorage.getItem("user-id");
+if (!userId) {
+  // Jika tidak ada, buat ID acak yang unik dan simpan
+  userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  localStorage.setItem("user-id", userId);
+}
+
+axios.interceptors.request.use(
+  (config) => {
+    config.headers["x-user-id"] = userId;
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 interface Todo {
   id: number;
   title: string;
   completed: boolean;
 }
 
-function App() {
-  // State untuk menyimpan daftar todos
-  const [todos, setTodos] = useState<Todo[]>([]);
-  // State untuk input todo baru
-  const [newTodoTitle, setNewTodoTitle] = useState("");
-  // State untuk input search
-  const [searchTerm, setSearchTerm] = useState("");
-  // State untuk status loading
-  const [loading, setLoading] = useState(true);
-  // State untuk pesan error
-  const [error, setError] = useState<string | null>("");
+// --- Sisa kode komponen tetap sama seperti sebelumnya ---
+const CheckIcon = () => (
+  <svg className="w-4 h-4 text-slate-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+    {" "}
+    <path d="M20 6L9 17l-5-5"></path>{" "}
+  </svg>
+);
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {" "}
+    <path d="M3 6h18"></path> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path> <line x1="10" y1="11" x2="10" y2="17"></line> <line x1="14" y1="11" x2="14" y2="17"></line>{" "}
+  </svg>
+);
 
-  // useEffect untuk mengambil data todos saat komponen pertama kali di-render
+function App() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');`;
+    document.head.appendChild(style);
+  }, []);
+  // 3. Perbarui penanganan error untuk mengenali status 401
   useEffect(() => {
     const fetchTodos = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(API_URL);
-        setTodos(response.data);
         setError(null);
+        const response = await axios.get(API_URL);
+        console.log(response);
+        const todos = response.data.sort((a, b) => b.id - a.id);
+        setTodos(todos);
       } catch (err) {
-        setError("Gagal memuat data todo. Pastikan server backend berjalan.");
-        console.error(err);
+        if (isAxiosError(err) && err.response) {
+          // err.response is defined, you can safely access its properties
+          setError(err.response.status + " " + err.response.statusText);
+          if (err.response.status === 401) {
+            setError("Autentikasi gagal");
+          }
+        } else {
+          setError("An unexpected error occurred");
+        }
       } finally {
         setLoading(false);
       }
     };
-
     fetchTodos();
   }, []);
 
   const handleAddTodo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodoTitle.trim()) return;
-
     try {
       const response = await axios.post(API_URL, { title: newTodoTitle });
       setTodos([...todos, response.data]);
-      setNewTodoTitle(""); // Reset input
+      setNewTodoTitle("");
     } catch (err) {
-      setError("Gagal menambahkan todo.");
+      setError(err.response.status + " " + err.response.statusText + " : Gagal menambahkan todo.");
       console.error(err);
     }
   };
-
-  // Handler untuk mengubah status completed todo
   const handleToggleTodo = async (id: number) => {
     try {
       const response = await axios.patch(`${API_URL}/${id}`);
@@ -64,69 +100,80 @@ function App() {
       console.error(err);
     }
   };
-
-  // Filter todos di sisi client berdasarkan searchTerm
+  const handleDeleteTodo = (id: number) => {
+    setTodos(todos.filter((todo) => todo.id !== id));
+  };
   const filteredTodos = useMemo(() => {
     return todos.filter((todo) => todo.title.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [todos, searchTerm]);
 
   return (
-    <div className="bg-gray-900 text-white min-h-screen font-sans">
-      <div className="container mx-auto p-4 md:p-8 max-w-3xl">
-        <header className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold text-cyan-400">Todo App</h1>
-          <p className="text-gray-400">Dibangun dengan NestJS & React</p>
+    <div className="bg-slate-900 text-slate-200 min-h-screen font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>
+      <div className="container mx-auto p-4 md:p-8 max-w-2xl">
+        <header className="text-center mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-sky-400 to-cyan-300 text-transparent bg-clip-text mb-2"> Todo List </h1>
+          <p className="text-slate-400">Dibangun dengan NestJS & React</p>
         </header>
 
-        <main>
-          {/* Form untuk menambah todo */}
-          <form onSubmit={handleAddTodo} className="mb-8 flex flex-col sm:flex-row gap-2">
+        <div className="text-center mb-4 text-xs text-slate-500 break-all">
+          <p>User ID: {userId}</p>
+        </div>
+
+        <main className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-2xl shadow-black/20 p-6 md:p-8">
+          <form onSubmit={handleAddTodo} className="mb-6 flex gap-3">
+            {" "}
             <input
               type="text"
               value={newTodoTitle}
               onChange={(e) => setNewTodoTitle(e.target.value)}
-              placeholder="Apa yang ingin kamu lakukan?"
-              className="flex-grow bg-gray-800 border-2 border-gray-700 rounded-md py-2 px-4 focus:outline-none focus:border-cyan-500 transition"
-            />
-            <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-md transition duration-300">
-              Add
-            </button>
+              placeholder="Tambahkan tugas baru..."
+              className="flex-grow bg-slate-900/70 border border-slate-700 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300"
+            />{" "}
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-100"
+            >
+              {" "}
+              Add{" "}
+            </button>{" "}
           </form>
-
-          {/* Input untuk search */}
-          <div className="mb-4">
+          <div className="mb-6">
+            {" "}
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari todo..."
-              className="w-full bg-gray-800 border-2 border-gray-700 rounded-md py-2 px-4 focus:outline-none focus:border-cyan-500 transition"
-            />
+              placeholder="Cari tugas..."
+              className="w-full bg-slate-900/70 border border-slate-700 rounded-lg py-3 px-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all duration-300"
+            />{" "}
           </div>
-
-          {/* Menampilkan status loading atau error */}
-          {loading && <p className="text-center text-gray-400">Loading...</p>}
-          {error && <p className="text-center text-red-500 bg-red-900/50 p-3 rounded-md">{error}</p>}
-
-          {/* Daftar Todos */}
+          {loading && <p className="text-center text-slate-400 animate-pulse">Memuat data...</p>}
+          {error && <p className="text-center text-red-400 bg-red-900/30 border border-red-500/30 p-3 rounded-lg">{error}</p>}
           {!loading && !error && (
-            <div className="bg-gray-800 rounded-lg shadow-lg">
-              <ul className="divide-y divide-gray-700">
-                {filteredTodos.length > 0 ? (
-                  filteredTodos.map((todo, index) => (
-                    <li key={todo.id} className="p-4 flex items-center justify-between">
-                      <div className="flex items-center">
-                        <span className="text-gray-500 w-6 text-sm">{index + 1}.</span>
-                        <input type="checkbox" checked={todo.completed} onChange={() => handleToggleTodo(todo.id)} className="h-5 w-5 rounded bg-gray-700 border-gray-600 text-cyan-500 focus:ring-cyan-600 cursor-pointer mx-4" />
-                        <span className={`text-lg ${todo.completed ? "line-through text-gray-500" : ""}`}>{todo.title}</span>
+            <ul className="space-y-3">
+              {filteredTodos.length > 0 ? (
+                filteredTodos.map((todo) => (
+                  <li
+                    key={todo.id}
+                    className={`flex items-center justify-between bg-slate-800/60 border border-slate-700 rounded-lg p-4 transition-all duration-300 ${todo.completed ? "opacity-50" : "hover:bg-slate-700/50 hover:border-slate-600"}`}
+                  >
+                    <div className="flex items-center cursor-pointer" onClick={() => handleToggleTodo(todo.id)}>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${todo.completed ? "bg-sky-500 border-sky-500" : "border-slate-500"}`}>
+                        {" "}
+                        {todo.completed && <CheckIcon />}{" "}
                       </div>
-                    </li>
-                  ))
-                ) : (
-                  <p className="text-center text-gray-500 p-6">Tidak ada todo.</p>
-                )}
-              </ul>
-            </div>
+                      <span className={`ml-4 text-lg ${todo.completed ? "line-through text-slate-500" : "text-slate-200"}`}> {todo.title} </span>
+                    </div>
+                    <button onClick={() => handleDeleteTodo(todo.id)} className="text-slate-500 hover:text-red-400 transition-colors duration-300 p-1 rounded-full hover:bg-slate-700/50">
+                      {" "}
+                      <TrashIcon />{" "}
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <p className="text-center text-slate-500 p-6">Yeay! Tidak ada tugas tersisa.</p>
+              )}
+            </ul>
           )}
         </main>
       </div>

@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   ParseIntPipe,
+  Req,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 // Import 'Todo' sebagai tipe, bukan value
@@ -23,7 +24,9 @@ export class AppController {
   }
 
   @Post()
-  create(@Body() createTodoDto: CreateTodoDto): Todo {
+  create(@Body() createTodoDto: CreateTodoDto, @Req() req: Request): Todo {
+    console.log(`Request received from user ID: ${req.headers['x-user-id']}`);
+    console.log('Request body:', createTodoDto);
     return this.appService.create(createTodoDto);
   }
 
