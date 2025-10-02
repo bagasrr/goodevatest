@@ -4,7 +4,7 @@ Ini adalah proyek todo sederhana yang dibangun dengan NestJS sebagai backend dan
 
 ## Versi Node yang Digunakan
 
-Proyek ini dikembangkan dan diuji menggunakan Node.js v18.x.
+Proyek ini dikembangkan dan diuji menggunakan Node.js v22.12.0
 
 ## Cara Menjalankan Aplikasi
 
